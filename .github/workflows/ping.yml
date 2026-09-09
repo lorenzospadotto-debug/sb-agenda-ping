@@ -17,6 +17,10 @@ on:
     - cron: "31 4 * * *"   # 06:31 ora legale italiana
     - cron: "46 4 * * *"
     - cron: "1 5 * * *"
+    # PROVE del 9 settembre 2026, da togliere subito dopo
+    - cron: "34 10 * * *"
+    - cron: "41 10 * * *"
+    - cron: "48 10 * * *"
   workflow_dispatch:
     inputs:
       force:
