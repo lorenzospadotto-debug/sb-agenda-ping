@@ -95,13 +95,15 @@ jobs:
           # usiamo repos/$TARGET/dispatches, che richiederebbe "Contents = Read and write",
           # cioe' il permesso di riscrivere il codice del repository di destinazione: un token
           # rubato potrebbe farci girare codice qualunque con i segreti che quel repo contiene.
-          if gh workflow run agenda --repo "$TARGET" -f apply=true -f revoke=false; then
+          if ERR=$(gh workflow run agenda --repo "$TARGET" -f apply=true -f revoke=false 2>&1); then
             echo "Sveglia inviata."
             exit 0
           fi
 
-          # RIPIEGO TEMPORANEO, da togliere appena il token ha "Actions = Read and write".
-          echo "ATTENZIONE: non riesco a lanciare il workflow (al token manca Actions = Read and write)."
+          # RIPIEGO TEMPORANEO, da togliere appena il token ha i permessi giusti.
+          echo "Risposta di GitHub al tentativo di lanciare il workflow:"
+          echo "$ERR" | sed 's/^/    /'
+          echo "ATTENZIONE: non riesco a lanciare il workflow."
           echo "ATTENZIONE: ripiego sul vecchio dispatch, che richiede il permesso piu' ampio Contents = Read and write."
           echo "ATTENZIONE: aggiorna i permessi del token, poi questo ripiego va rimosso."
           if ! gh api "repos/$TARGET/dispatches" -f event_type=run-agenda --silent; then
