@@ -95,7 +95,10 @@ jobs:
           # usiamo repos/$TARGET/dispatches, che richiederebbe "Contents = Read and write",
           # cioe' il permesso di riscrivere il codice del repository di destinazione: un token
           # rubato potrebbe farci girare codice qualunque con i segreti che quel repo contiene.
-          if ERR=$(gh workflow run agenda --repo "$TARGET" -f apply=true -f revoke=false 2>&1); then
+          # Chiamiamo direttamente l'endpoint indicando il branch: "gh workflow run" cercherebbe
+          # da solo il branch di default con una query che richiede anche Contents = read.
+          if ERR=$(gh api -X POST "repos/$TARGET/actions/workflows/agenda.yml/dispatches" \
+                     -f ref=main -f "inputs[apply]=true" -f "inputs[revoke]=false" --silent 2>&1); then
             echo "Sveglia inviata."
             exit 0
           fi
