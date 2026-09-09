@@ -101,20 +101,15 @@ jobs:
           # rubato potrebbe farci girare codice qualunque con i segreti che quel repo contiene.
           # Chiamiamo direttamente l'endpoint indicando il branch: "gh workflow run" cercherebbe
           # da solo il branch di default con una query che richiede anche Contents = read.
+          # Si puo' lanciare solo "agenda": la revoca d'emergenza vive in un altro workflow,
+          # che questo token non ha modo di far partire.
           if ERR=$(gh api -X POST "repos/$TARGET/actions/workflows/agenda.yml/dispatches" \
-                     -f ref=main -f "inputs[apply]=true" -f "inputs[revoke]=false" --silent 2>&1); then
+                     -f ref=main -f "inputs[apply]=true" --silent 2>&1); then
             echo "Sveglia inviata."
             exit 0
           fi
 
-          # RIPIEGO TEMPORANEO, da togliere appena il token ha i permessi giusti.
-          echo "Risposta di GitHub al tentativo di lanciare il workflow:"
+          echo "ERRORE: non riesco a lanciare il workflow. Risposta di GitHub:"
           echo "$ERR" | sed 's/^/    /'
-          echo "ATTENZIONE: non riesco a lanciare il workflow."
-          echo "ATTENZIONE: ripiego sul vecchio dispatch, che richiede il permesso piu' ampio Contents = Read and write."
-          echo "ATTENZIONE: aggiorna i permessi del token, poi questo ripiego va rimosso."
-          if ! gh api "repos/$TARGET/dispatches" -f event_type=run-agenda --silent; then
-            echo "ERRORE: anche il ripiego e' stato rifiutato. Il repository di destinazione non e' stato svegliato."
-            exit 1
-          fi
-          echo "Sveglia inviata (col ripiego)."
+          echo "Controlla che il token abbia Actions = Read and write sul repository di destinazione."
+          exit 1
