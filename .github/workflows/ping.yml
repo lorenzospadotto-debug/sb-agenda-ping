@@ -33,6 +33,21 @@ jobs:
           # riceve 404 (non 403): GitHub non rivela l'esistenza dei repo privati.
           if ! gh api "repos/$TARGET" --jq .full_name >/dev/null 2>&1; then
             echo "ERRORE: il token non vede il repository di destinazione."
+
+            # Restringiamo il campo: il token e' valido? e vede i repo pubblici?
+            if CHI=$(gh api user --jq .login 2>/dev/null); then
+              echo "  Il token e' valido e appartiene a: $CHI"
+              if gh api "repos/$GITHUB_REPOSITORY" --jq .full_name >/dev/null 2>&1; then
+                echo "  Vede questo repository, che e' pubblico, ma non la destinazione, che e' privata."
+                echo "  => quasi certamente Repository access e' rimasto su \"Public repositories\","
+                echo "     oppure fra i repository selezionati c'e' quello sbagliato."
+              else
+                echo "  Non vede nemmeno questo repository: il token non ha accesso a nulla di utile."
+              fi
+            else
+              echo "  Il token non e' valido: scaduto, revocato, o incollato male."
+            fi
+
             echo "Controlla, nelle impostazioni del token:"
             echo "  - Repository access = Only select repositories, con il repo selezionato"
             echo "    (il valore predefinito e' \"Public repositories\", che NON basta: il repo e' privato)"
