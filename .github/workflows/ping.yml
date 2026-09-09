@@ -14,6 +14,10 @@ on:
   schedule:
     - cron: "31 4 * * *"   # 04:31 UTC, dopo il cron interno del repo di destinazione (04:23)
   workflow_dispatch:
+    inputs:
+      force:
+        description: "true = manda la sveglia anche se un run di oggi c'e' gia' (per provare il dispatch)"
+        default: "false"
 
 jobs:
   ping:
@@ -24,6 +28,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.TARGET_TOKEN }}
           TARGET: ${{ secrets.TARGET_REPO }}
+          FORCE: ${{ inputs.force }}
         run: |
           set -uo pipefail
           test -n "${GH_TOKEN:-}" || { echo "Secret TARGET_TOKEN mancante"; exit 1; }
@@ -67,7 +72,9 @@ jobs:
           RUNS=$(gh api "repos/$TARGET/actions/runs?per_page=30" \
             --jq "[.workflow_runs[] | select(.name==\"agenda\") | select(.created_at | startswith(\"$OGGI\"))] | length" 2>/dev/null)
 
-          if [ -z "$RUNS" ]; then
+          if [ "${FORCE:-false}" = "true" ]; then
+            echo "Richiesta forzata: mando il dispatch comunque."
+          elif [ -z "$RUNS" ]; then
             echo "ATTENZIONE: non riesco a leggere i run (manca il permesso Actions = Read-only?)."
             echo "Mando il dispatch senza il controllo anti-doppione."
           elif [ "$RUNS" -gt 0 ]; then
