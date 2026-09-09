@@ -12,8 +12,7 @@ name: ping
 
 on:
   schedule:
-    - cron: "31 4 * * *"   # 04:31 UTC, l'orario vero di ogni mattina
-    - cron: "28 9 * * *"   # PROVA del 9 settembre 2026, da togliere subito dopo
+    - cron: "31 4 * * *"   # 04:31 UTC
   workflow_dispatch:
     inputs:
       force:
