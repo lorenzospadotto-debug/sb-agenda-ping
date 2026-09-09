@@ -12,7 +12,11 @@ name: ping
 
 on:
   schedule:
-    - cron: "31 4 * * *"   # 04:31 UTC
+    # Tre tentativi ravvicinati: se GitHub salta un'occorrenza, ne resta un'altra.
+    # Il controllo anti-doppione fa si' che il run parta comunque una volta sola.
+    - cron: "31 4 * * *"   # 06:31 ora legale italiana
+    - cron: "46 4 * * *"
+    - cron: "1 5 * * *"
   workflow_dispatch:
     inputs:
       force:
