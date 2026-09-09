@@ -20,6 +20,9 @@ on:
         description: "true = manda la sveglia anche se un run di oggi c'e' gia' (per provare il dispatch)"
         default: "false"
 
+# La sveglia non tocca questo repository: il token interno non le serve.
+permissions: {}
+
 jobs:
   ping:
     runs-on: ubuntu-latest
@@ -85,8 +88,21 @@ jobs:
             echo "Nessun run per oggi ($OGGI): mando il dispatch."
           fi
 
+          # Si lancia il workflow per nome: serve "Actions = Read and write". Di proposito NON
+          # usiamo repos/$TARGET/dispatches, che richiederebbe "Contents = Read and write",
+          # cioe' il permesso di riscrivere il codice del repository di destinazione: un token
+          # rubato potrebbe farci girare codice qualunque con i segreti che quel repo contiene.
+          if gh workflow run agenda --repo "$TARGET" -f apply=true -f revoke=false; then
+            echo "Sveglia inviata."
+            exit 0
+          fi
+
+          # RIPIEGO TEMPORANEO, da togliere appena il token ha "Actions = Read and write".
+          echo "ATTENZIONE: non riesco a lanciare il workflow (al token manca Actions = Read and write)."
+          echo "ATTENZIONE: ripiego sul vecchio dispatch, che richiede il permesso piu' ampio Contents = Read and write."
+          echo "ATTENZIONE: aggiorna i permessi del token, poi questo ripiego va rimosso."
           if ! gh api "repos/$TARGET/dispatches" -f event_type=run-agenda --silent; then
-            echo "ERRORE: dispatch rifiutato (serve Contents = Read and write)."
+            echo "ERRORE: anche il ripiego e' stato rifiutato. Il repository di destinazione non e' stato svegliato."
             exit 1
           fi
-          echo "Dispatch inviato."
+          echo "Sveglia inviata (col ripiego)."
