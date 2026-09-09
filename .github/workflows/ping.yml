@@ -25,23 +25,45 @@ jobs:
           GH_TOKEN: ${{ secrets.TARGET_TOKEN }}
           TARGET: ${{ secrets.TARGET_REPO }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           test -n "${GH_TOKEN:-}" || { echo "Secret TARGET_TOKEN mancante"; exit 1; }
           test -n "${TARGET:-}"   || { echo "Secret TARGET_REPO mancante"; exit 1; }
+
+          # Il token vede il repository? Un token fine-grained che non ha accesso
+          # riceve 404 (non 403): GitHub non rivela l'esistenza dei repo privati.
+          if ! gh api "repos/$TARGET" --jq .full_name >/dev/null 2>&1; then
+            echo "ERRORE: il token non vede il repository di destinazione."
+            echo "Controlla, nelle impostazioni del token:"
+            echo "  - Repository access = Only select repositories, con il repo selezionato"
+            echo "    (il valore predefinito e' \"Public repositories\", che NON basta: il repo e' privato)"
+            echo "  - Permissions: Contents = Read and write, Actions = Read-only"
+            echo "  - che il token non sia scaduto o revocato"
+            exit 1
+          fi
+          echo "Repository visibile al token: ok."
 
           OGGI=$(date -u +%Y-%m-%d)
 
           # Se un run di oggi c'e' gia' (il cron interno ha funzionato, oppure il
           # trigger locale sul Mac ha gia' fatto il suo lavoro) non ne lanciamo un altro.
-          GIA_FATTO=$(gh run list --repo "$TARGET" --workflow=agenda --limit 20 \
-            --json databaseId,event,status,conclusion,createdAt \
-            --jq "[.[] | select(.createdAt | startswith(\"$OGGI\"))] | length")
+          # Serve il permesso Actions = Read-only; se manca, lo diciamo e proseguiamo:
+          # meglio un run in piu' (il workflow di destinazione e' idempotente e ha
+          # concurrency) che un'agenda non aggiornata.
+          RUNS=$(gh api "repos/$TARGET/actions/runs?per_page=30" \
+            --jq "[.workflow_runs[] | select(.name==\"agenda\") | select(.created_at | startswith(\"$OGGI\"))] | length" 2>/dev/null)
 
-          if [ "$GIA_FATTO" -gt 0 ]; then
+          if [ -z "$RUNS" ]; then
+            echo "ATTENZIONE: non riesco a leggere i run (manca il permesso Actions = Read-only?)."
+            echo "Mando il dispatch senza il controllo anti-doppione."
+          elif [ "$RUNS" -gt 0 ]; then
             echo "Run gia' presente per oggi ($OGGI): non serve la sveglia."
             exit 0
+          else
+            echo "Nessun run per oggi ($OGGI): mando il dispatch."
           fi
 
-          echo "Nessun run per oggi ($OGGI): mando il dispatch."
-          gh api "repos/$TARGET/dispatches" -f event_type=run-agenda --silent
+          if ! gh api "repos/$TARGET/dispatches" -f event_type=run-agenda --silent; then
+            echo "ERRORE: dispatch rifiutato (serve Contents = Read and write)."
+            exit 1
+          fi
           echo "Dispatch inviato."
