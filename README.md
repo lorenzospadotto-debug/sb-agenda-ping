@@ -1,4 +1,4 @@
-# skinboost-agenda-ping
+# sb-agenda-ping
 
 Sveglia pianificata per il workflow `agenda` di un repository privato.
 
