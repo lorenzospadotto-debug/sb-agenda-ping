@@ -1,0 +1,47 @@
+name: ping
+
+# Sveglia pianificata per il workflow "agenda" di un repository privato.
+#
+# Perche' esiste: GitHub salta o rimanda spesso gli "schedule" sui repository
+# privati con poca attivita' (8 e 9 settembre 2026: nessun run partito da solo).
+# Sui repository pubblici gli schedule sono molto piu' affidabili, quindi questo
+# repo fa da sveglia e manda un repository_dispatch al repo privato.
+#
+# Qui dentro non c'e' nulla di riservato: sia il nome del repo di destinazione
+# sia il token stanno nei Secrets.
+
+on:
+  schedule:
+    - cron: "31 4 * * *"   # 04:31 UTC, dopo il cron interno del repo di destinazione (04:23)
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Sveglia il workflow agenda
+        env:
+          GH_TOKEN: ${{ secrets.TARGET_TOKEN }}
+          TARGET: ${{ secrets.TARGET_REPO }}
+        run: |
+          set -euo pipefail
+          test -n "${GH_TOKEN:-}" || { echo "Secret TARGET_TOKEN mancante"; exit 1; }
+          test -n "${TARGET:-}"   || { echo "Secret TARGET_REPO mancante"; exit 1; }
+
+          OGGI=$(date -u +%Y-%m-%d)
+
+          # Se un run di oggi c'e' gia' (il cron interno ha funzionato, oppure il
+          # trigger locale sul Mac ha gia' fatto il suo lavoro) non ne lanciamo un altro.
+          GIA_FATTO=$(gh run list --repo "$TARGET" --workflow=agenda --limit 20 \
+            --json databaseId,event,status,conclusion,createdAt \
+            --jq "[.[] | select(.createdAt | startswith(\"$OGGI\"))] | length")
+
+          if [ "$GIA_FATTO" -gt 0 ]; then
+            echo "Run gia' presente per oggi ($OGGI): non serve la sveglia."
+            exit 0
+          fi
+
+          echo "Nessun run per oggi ($OGGI): mando il dispatch."
+          gh api "repos/$TARGET/dispatches" -f event_type=run-agenda --silent
+          echo "Dispatch inviato."
